@@ -25,7 +25,7 @@ Antena Diamond BC-100S jest anteną przeznaczoną do odbioru sygnałów spolaryz
 Zródło: [practicalantennas.com](https://practicalantennas.com/designs/verticals/5eights/)
 
 Dla naszego zastosowania lepsza byłaby antena typu turnstile lub QFH, ponieważ mają bardziej równomierne charakterystyki zysku.
-![wykresy](docs-pics\A-double-turnstile-antenna-in-free-space-a-The-3-D-view-and-b-its-radiation-pattern.png "turnstile")
+![turnstile](docs-pics/double_turnstile.png "turnstile")
 Źródło: [researchgate.net](https://www.researchgate.net/figure/A-double-turnstile-antenna-in-free-space-a-The-3-D-view-and-b-its-radiation-pattern_fig2_282776048)
 ##### Polaryzacja
 Anteny turnstile i QFH działają w polaryzacji kołowej, czyli takiej jak ta, w jakiej operują satelity na których będziemy się skupiać. *Polarisation mismatch loss* między sygnałem transmitowanym w polarycji kołowej, a anteną odbiorczą spolaryzowaną liniowo to 3dB, więc mimo ogólnie dużego zysku anteny Diamond BC100S, wciąż tracimy nieco na jakości odbioru. Będzie to uwidoczniało słabą recepcję w przelotach "nad głową", czyli tych teoretycznie najlepszych.
