@@ -1,37 +1,49 @@
 ## Wykorzystany sprzęt
 
-* Raspberry Pi 5 (8GB ram &#8594; overkill)
+* Raspberry Pi 5 (8GB ram)
     * zasilacz usb-c 27W
     * obudowa z wentylatorem
     * SSD SATA 240GB (*) + adapter USB-SATA Ugreen
 * RTL-SDR V3
 * antena Diamond BC100S
 * przewód antenowy (aktualnie RG174, docelowo najlepiej RG58)
-* tani, chiński wzmacniacz szerokopasmowy [SPF5189Z](https://pl.aliexpress.com/item/1005007995348208.html), zmodyfikowany do zasilania przez bias-t
 * zestaw adapterów złącz antenowych
     * PL-259 &#8594; SMA female
-    * SMA female &#8594; F male
-    * F female &#8594; SMA male
+    * SMA female &#8594; SMA female
+
+* (opcjonalny) wzmacniacz szerokopasmowy [SPF5189Z](https://pl.aliexpress.com/item/1005007995348208.html), zmodyfikowany do zasilania przez bias-t
 
 (*) dysk 240GB jest zdecydowanie zbyt duży jeśli nie zdecydujemy się na zapisywanie basebandu z odebranych transmisji. Domyślnie ta opcja jest wyłączona, a pliki (nazywane [artefaktami](https://wiki.satnogs.org/Artifacts)) po wysłaniu na serwery satNOGS są usuwane z pamięci lokalnej.
 
+### Tor RF
+Antena &#8594; adapter PL-259 do SMA female &#8594; wzmacniacz SPF5189Z &#8594; 10m kabla RG174 &#8594; 3m kabla RG174 &#8594; 15cm kabel SMA female do SMA female &#8594; RTL-SDR V3
+
+
 ## Antena
-Antena Diamond BC-100S jest anteną przeznaczoną do odbioru/nadawania transmisji spolaryzowanych pionowo, w paśmie UHF, z możliwością dostrojenia. Anteny 5/8 $\lambda$ mają charakterystykę bardzo skupioną na horyzoncie, z dużym spadkiem zysku przy ok. 30 i 90 stopniach.
+Antena Diamond BC-100S jest anteną przeznaczoną do odbioru sygnałów spolaryzowanych pionowo w paśmie UHF (115 - 174 MHz, z możliwością dostrojenia). Anteny 5/8 $\lambda$ mają charakterystykę bardzo skupioną na horyzoncie, z dużym spadkiem zysku przy ok. 30 i 90 stopniach.
 ![wykresy](docs-pics/vert_lengths_perfect_ground_4.png "zysk 5/8")
 Zródło: [practicalantennas.com](https://practicalantennas.com/designs/verticals/5eights/)
+
+Dla naszego zastosowania lepsza byłaby antena typu turnstile lub QFH, ponieważ mają bardziej równomierne charakterystyki zysku.
+![wykresy](docs-pics\A-double-turnstile-antenna-in-free-space-a-The-3-D-view-and-b-its-radiation-pattern.png "turnstile")
+Źródło: [researchgate.net](https://www.researchgate.net/figure/A-double-turnstile-antenna-in-free-space-a-The-3-D-view-and-b-its-radiation-pattern_fig2_282776048)
+##### Polaryzacja
+Anteny turnstile i QFH działają w polaryzacji kołowej, czyli takiej jak ta, w jakiej operują satelity na których będziemy się skupiać. *Polarisation mismatch loss* między sygnałem transmitowanym w polarycji kołowej, a anteną odbiorczą spolaryzowaną liniowo to 3dB, więc mimo ogólnie dużego zysku anteny Diamond BC100S, wciąż tracimy nieco na jakości odbioru. Będzie to uwidoczniało słabą recepcję w przelotach "nad głową", czyli tych teoretycznie najlepszych.
+Źródło: [microwaves101.com](https://www.microwaves101.com/encyclopedias/polarization-mismatch-between-antennas)
+
 
 ## Konfiguracja środowiska
 
 #### Instalacja systemu na Raspberry
-Na dysku należy zainstalować system Raspbian 64 bit za pomocą [Raspberry Pi Imager](https://www.raspberrypi.com/software/). Po wybraniu właściwej płytki, wersji systemu i docelowego dysku, kreator zapyta, czy chcemy customizować instalację. Serwer skonfigurujemy jako <em>headless</em>, więc należy wybrać "<em>edit settings</em>", następnie uzupełnić pole z nazwą użytkownika i hasłem, i ostatecznie włączyć serwer SSH w drugiej zakładce. Po zainstalowaniu systemu na dysku, ten zostanie automatycznie odłączony - można więc go podłączyć do Raspbery i przejść do kolejnego kroku.
+Na dysku zainstalowano system Raspbian 64 bit za pomocą [Raspberry Pi Imager](https://www.raspberrypi.com/software/). Po wybraniu właściwej płytki, wersji systemu i docelowego dysku, kreator zapyta, czy chcemy customizować instalację. Serwer skonfigurujemy jako <em>headless</em>, więc należy wybrać "<em>edit settings</em>", następnie uzupełnić pole z nazwą użytkownika i hasłem, i ostatecznie włączyć serwer SSH w drugiej zakładce. Po zainstalowaniu systemu na dysk, zostanie on automatycznie odłączony - można go podłączyć do Raspberry i przejść do kolejnego kroku.
 
-#### Konfiguracja środowiska
+
 
 ##### Konfiguracja SSH
-Do świeżo uruchomionego Raspberry łączymy się przez ssh, w tym przypadku poprzez polecenie `ssh satpi@192.168.50.26`. Dla ułatwienia pracy zalecane jest wklejenie swojego klucza publicznego do `/home/satpi/.ssh/authorized_keys` - nie będzie trzeba wpisywać za każdym razem ustalonego wcześniej hasła. `satpi` naturalnie należy zmienić na własnego usera.
+Do świeżo uruchomionego Raspberry łączymy się przez ssh poleceniem `ssh satpi@192.168.50.26`. `satpi` to wybrana na etapie konfiguracji nazwa użytkownika, zaś adres IP najlepiej sprawdzić w panelu administracyjym routera, a jeśli nie mamy do niego dostępu - programem *nmap* lub [Advanced IP Scanner](https://www.advanced-ip-scanner.com/pl/). Dla ułatwienia pracy zalecane jest wklejenie swojego klucza publicznego do `/home/satpi/.ssh/authorized_keys` - nie będzie trzeba wpisywać za każdym razem ustalonego wcześniej hasła.
 
 ##### Instalacja klienta VPN
-Aby można było połączyć się z Raspberry nawet, gdy zainstalujemy je poza naszą siecią lokalną, lub aby dać do niego dostęp współpracownikom, należy uzbroić je w tunel VPN. W naszym przypadku serwerem VPN jest self-hosted instancja Wireguarda działająca na innym komputerze klasy Raspberry (VPS to dodatkowy koszt, a niektórzy ISP wciąż oferują publiczne adresy IPv4 🙏). Na Raspberry instalujemy Wireguarda:
+Aby można było połączyć się z Raspberry nawet, gdy będziemy chcieli zainstalować stację satNOGS poza naszą siecią lokalną, albo aby dać do niego dostęp współpracownikom, należy uzbroić je w tunel VPN. W naszym przypadku serwerem VPN jest self-hosted instancja Wireguarda działająca na innym komputerze klasy Raspberry (VPS to dodatkowy koszt, a niektórzy ISP wciąż oferują publiczne adresy IPv4 🙏). Na Raspberry instalujemy Wireguarda:
 `sudo apt update && sudo apt upgrade`
 `sudo apt install wireguard`
 `sudo apt install openresolv` (bez tego wireguard nie utworzy tunelu)
@@ -47,7 +59,7 @@ PresharedKey = [...]
 Endpoint = [VPN_SERVER_IP]:51820
 AllowedIPs = 10.154.37.0/24
 PersistentKeepAlive = 25</pre>
-I kopiujemy go na Raspberry:
+I przeklejamy jego treść na Raspberry:
 `sudo nano /etc/wireguard/satnogs.conf`
 
 Pole <em>PersistentKeepAlive</em> jest kluczowe. Bez niego ruch z zewnątrz nie dociera do Raspberry, nie da się połączyć z nim przez ssh ani spingować. Problem ustawał tymczasowo po wysłaniu z Raspberry pingu na inną maszynę w sieci VPN. Jest to związane z działaniem firewalla i zamykaniem nieaktywnych połączeń.
@@ -63,16 +75,20 @@ Wszystko jest ok, więc można skonfigurować Wireguarda jako usługę systemd, 
 sudo systemctl start wg-quick@satnogs</pre>
 Teraz możemy łączyć się do Raspberry gdziekolwiek będzie miało dostęp do internetu. Będzie to przydatne w momencie przemieszczenia stacji bazowej satNOGS.
 
+###### Alternatywa dla Wireguard
+Ciekawą i bardzo prostą w instalacji alternatywą dla Wireguard jest [Tailscale](https://tailscale.com/). To rozwiązanie działające out-of-the-box, choć darmowy tier ma ograniczenie do 3 użytkowników w zespole.
+
 #### Instalacja Dockera
-Klient satNOGS uruchamiany jest w kontenerze Dockera. Docker został zainstalowany zgodnie z [oficjalnym poradnikiem](https://docs.docker.com/engine/install/debian/#install-using-the-repository). Domyślnie nasz użytkownik nie należy do grupy dockera, i wszystkie polecenia należy wykonywać z wykorzystaniem `sudo`. Aby to zmienić, postępujemy wykonujemy następujące [kroki](https://stackoverflow.com/questions/48957195/how-to-fix-docker-got-permission-denied-issue):
+Preferowaną metodą uruchomienia klienta satNOGS jest zrobienie tego w kontenerze Dockera. Docker został zainstalowany zgodnie z [oficjalnym poradnikiem](https://docs.docker.com/engine/install/debian/#install-using-the-repository). Domyślnie nasz użytkownik nie należy do grupy dockera, i wszystkie polecenia należy wykonywać z wykorzystaniem `sudo`. Aby to zmienić, wykonujemy następujące kroki (wg. poradnika ze [stackoverflow](https://stackoverflow.com/questions/48957195/how-to-fix-docker-got-permission-denied-issue)):
 <pre>sudo groupadd docker
-sudo usermod -aG docker $USER
+sudo usermod -aG docker $USER 
 newgrp docker
 sudo systemctl restart docker</pre>
-Weryfikujemy prawidłowe działanie Dockera poleceniem `docker run hello-world`. Powinien zostać pobrany obraz, a w konsoli wyświetli się komunikat informujący o sukcesie.
-#### Instalacja klienta satNOGS - wersja minimalna
+Weryfikujemy prawidłowe działanie Dockera poleceniem `docker run hello-world`. Powinien zostać pobrany obraz testowy, a w konsoli wyświetli się komunikat informujący o sukcesie.
+### Instalacja klienta satNOGS - wersja minimalna
 Uruchamianie klienta satNOGS jako dockerowego kontenera ma wiele zalet:
 * konfiguracja przechowywana w jednym pliku
+* łatwość wprowadzania zmian 
 * łatwe zarządzanie zasobami
 * skalowalność (można posiadać wiele stacji na jednym serwerze)
 * jeśli coś nie zepsujemy, nie "krzywdzimy" konfiguracji systemowej hosta, problem jest self-contained w kontenerze i można go po prostu usunąć i stworzyć od nowa
@@ -88,7 +104,7 @@ REPOSITORY                  TAG       IMAGE ID       CREATED         SIZE
 satnogs-client              latest    a445945dd4d5   3 hours ago     2.26GB</pre>
 
 
-Teraz możemy utworzyć w katalogu domowym folder o nazwie adekwatnej nazwie - np. `gs4063` (groundstation 4063, liczba odpowiada id stacji satNOGS). W folderze tworzymy dwa pliki: `compose.yml` i `.env`. Plik `compose.yml` będzie wyglądał tak (bez zmian):
+Teraz możemy utworzyć w katalogu domowym folder o nazwie adekwatnej nazwie - np. `gs4063` (groundstation 4063, gdzie 4063 to nasz numer stacji satNOGS). W folderze tworzymy dwa pliki: `compose.yml` i `.env`. Plik `compose.yml` będzie wyglądał tak (bez zmian):
 <pre>services:
 
   rigctld:
@@ -101,10 +117,6 @@ Teraz możemy utworzyć w katalogu domowym folder o nazwie adekwatnej nazwie - n
     command: 'rigctld'
 
  satnogs_client:
-    build:
-      context: .
-      args:
-        GNURADIO_IMAGE_TAG: '${GNURADIO_IMAGE_TAG:-3.8.2.0-satnogs}'
     image: 'satnogs-client'
     user: '500:500'
     read_only: true
@@ -130,9 +142,9 @@ SATNOGS_RX_SAMP_RATE: '1.024e6'
 SATNOGS_RF_GAIN: "32.8" #tu należy poeksperymentować
 SATNOGS_STATION_ID: '4063'
 SATNOGS_STATION_ELEV: '160'
-SATNOGS_STATION_LAT: '51.2072'
-SATNOGS_STATION_LON: '17.4054'
-#SATNOGS_LOG_LEVEL: "DEBUG"
+SATNOGS_STATION_LAT: '51.20'
+SATNOGS_STATION_LON: '17.40'
+#SATNOGS_LOG_LEVEL: "DEBUG" #można odkomentować jeśli doswiadczamy problemów
 SATNOGS_RIG_IP: 'rigctld'
 SATNOGS_ROT_ENABLED: "False"
 ENABLE_IQ_DUMP: "True" 
@@ -140,8 +152,10 @@ IQ_DUMP_FILENAME: "/iq/file"
 SATNOGS_POST_OBSERVATION_SCRIPT: "/iq/satnogs-post.sh {{ID}}"
 </pre>
 
+##### (bardzo opcjonalne) Archiwizowanie danych
+Na tym etapie archiwizowanie danych przedstawione jest raczej jako ciekawostka i jest **ściśle odradzane**. Ma sens dopiero jeśli korzystamy z drugiego poradnika "na wypasie".
 
-Jeśli stacja ma archiwizować odebrane dane (na tym etapie jest to **odradzane!**, lepiej skorzystać z drugiego poradnika), należy ustawić argument `ENABLE_IQ_DUMP` na `True` oraz wskazać ścieżkę, gdzie plik ma zostać zapisany (`IQ_DUMP_FILENAME`). Ścieżka musi być widoczna dla kontenera, oraz kontener musi mieć do niej prawa. W tym celu utworzono folder współdzielony między kontenerem a hostem, razem z  plikiem "file" i nadano mu odpowiednie prawa.
+Jeśli stacja ma archiwizować odebrane dane, należy ustawić argument `ENABLE_IQ_DUMP` na `True` oraz wskazać ścieżkę, gdzie plik ma zostać zapisany (`IQ_DUMP_FILENAME`). Ścieżka musi być widoczna dla kontenera, oraz kontener musi mieć do niej prawa. W tym celu utworzono folder współdzielony między kontenerem a hostem, razem z  plikiem "file" i nadano mu odpowiednie prawa.
 
 <pre>
 mkdir data
@@ -157,12 +171,13 @@ echo "copying IQ file -> $IQ_NAME "
 cp /iq/file "$IQ_NAME"
 echo "OK copied /iq/file to $IQ_NAME"
 </pre>
-Teraz archiwalne zapisy przelotów będą zapisywane w folderze `data`. Uwaga - rozmiar folderu będzie rósł szybko, i w 
+Teraz archiwalne zapisy przelotów będą zapisywane w folderze `data`. Jest tylko jedno "ale" - plik będzie surowym zapisem binarnym, i nie będzie dało się go otworzyć w popularnych programach typu [SDRSharp](https://airspy.com/download/) (a przynajmniej tak, żeby miał sens). Należy go zatem przekonwertować do formatu `.wav`, ale żeby to zrobić, należy znać sample rate z jakim został zapisany. Nie jest to trywialne, ponieważ klient satNOGS decyduje o tym na podstawie paru parametrów. Jest to dokładniej wyjaśnione w dalszej części dokumentacji.
 
-Kontener uruchamiamy wchodząc w folder z plikiem compose za pomocą komendy `docker compose up -d`.
+##### Uruchomienie
+Kontener uruchamiamy wchodząc w folder z plikiem compose, za pomocą komendy `docker compose up -d`.
 
 #### Autoscheduling
-W obecnym stanie rzeczy, jakiekolwiek przeloty muszą zostać zaplanowane ręcznie, co nie jest optymalne, jeśli chcemy "zapomnieć" o naszej stacji i dać jej działać w tle. Korzystamy z oficjalnego projektu [satnogs auto scheduler](https://gitlab.com/librespacefoundation/satnogs/satnogs-auto-scheduler).
+W obecnym stanie rzeczy, jakiekolwiek przeloty muszą zostać zaplanowane ręcznie, co nie jest optymalne, jeśli chcemy "zapomnieć" o naszej stacji i dać jej działać w tle. Zautomatyzujemy to korzystając z oficjalnego projektu [satnogs auto scheduler](https://gitlab.com/librespacefoundation/satnogs/satnogs-auto-scheduler).
 
 <pre>
 git clone https://gitlab.com/librespacefoundation/satnogs/satnogs-auto-scheduler.git
@@ -190,16 +205,16 @@ services:
 
 Plik `station.env` uzupełniamy adekwatnymi kluczami API i numerem ID naszej stacji:
 <pre>
-# Your SatNOGS station ID
+#Your SatNOGS station ID
 SATNOGS_STATION_ID="4063"
 
-# Your SatNOGS network API token
+#Your SatNOGS network API token
 SATNOGS_API_TOKEN="..."
 
-# Your SatNOGS DB API token (optional, but recommended) (jednak jest wymagane)
+#Your SatNOGS DB API token (wbrew dokumentacji - jednak jest WYMAGANY)
 SATNOGS_DB_API_TOKEN="..."
 </pre>
-Klucz API DB pobieramy z tej strony: [db.satnogs.org](https://db.satnogs.org/). W prawym górnym rogu klikamy okrągłą ikonę, a następnie pole "Settings / API Token".
+Klucz API DB pobieramy ze strony: [db.satnogs.org](https://db.satnogs.org/). W prawym górnym rogu klikamy okrągłą ikonę, a następnie pole "Settings / API Token".
 
 W folderze `data/` tworzymy skrypt `entrypoint.sh`, który będzie co określony czas pobierał dane o przelotach i automatycznie je planował:
 
@@ -214,22 +229,24 @@ do
         sleep "$SLEEP_TIMER"
 done
 </pre>
-`SATNOGS_GS_ID` uzupełniamy o ID naszej stacji, `SLEEP_TIMER` ustawiamy na jakiś czas, w tym przypadku 3000 sekund = 50 minut. Flaga `-d` określa na ile godzin do przodu planujemy obserwacje (1.5h), flaga `-T` musi być obecna, jeśli nasza stacja jest w fazie testowej. Skrypt musi mieć własciciela `999` i flagę wykonywalności.
-Kontener uruchamiamy wchodząc w folder z plikiem compose za pomocą komendy `docker compose up -d`.
+`SATNOGS_GS_ID` uzupełniamy ID naszej stacji, `SLEEP_TIMER` ustawiamy na jakiś czas, w tym przypadku 3000 sekund = 50 minut. Flaga `-d` określa na ile godzin do przodu planujemy obserwacje (1.5h), flaga `-T` musi być obecna, jeśli nasza stacja jest w fazie testowej. Skrypt musi mieć własciciela `999` i flagę wykonywalności.
+##### Uruchomienie
+Kontener uruchamiamy wchodząc w folder z plikiem compose, za pomocą komendy `docker compose up -d`.
 
-#### Instalacja klienta satNOGS - wersja "na wypasie" 
-SatNOGS to duży projekt, ale jego oficjalne obrazy nie wykorzystują wszystkich możliwości. Skupimy się na forku [kng/satnogs-client-docker](https://github.com/kng/satnogs-client-docker), który rozszerza możliwości oryginalnych obrazów. 
+### Instalacja klienta satNOGS - wersja "na wypasie" (rekomendowana)
+SatNOGS to duży projekt, ale jego oficjalny obraz nie wykorzystuje wszystkich możliwości. Skupimy się na forku [kng/satnogs-client-docker](https://github.com/kng/satnogs-client-docker), który rozszerza bazową funkcjonalność klienta satNOGS. Zawiera między innymi: 
 * automatyczne obliczanie samplerate zapisanego basebandu
-* rozbudowane skrypt pre- i post-obserwacyjne
-* integracja [SatDump](https://github.com/SatDump/SatDump/tree/nightly) - najbardziej wszechstronnego oprogramowania do demodulowania i dekodowania sygnałów satelitarnych
+* rozbudowane skrypty pre- i post-obserwacyjne
+* integracja z [SatDump](https://github.com/SatDump/SatDump/tree/nightly) - najbardziej wszechstronnym oprogramowaniem do demodulowania i dekodowania sygnałów satelitarnych
 * obsługa pipeline do odbierania obrazów z satelitów Meteor (która okazała się być niedziałająca)
+
 Mimo bycia dość rozbudowanym, projekt jest słabo udokumentowany i wymagał pewnej inżynierii wstecznej i modyfikacji paru plików, aby działał jak powinien.
 
-##### Instalacja obrazu bazowego
+#### Instalacja obrazu bazowego
 Zacznijmy od podstaw. Tworzymy folder o adekwatnej nazwie, np. `gs4063`. Będziemy w nim przechowywać:
 * plik `compose.yml`
 * plik `station.env`
-* folder z repozytorium 
+* folder z repozytorium
 * folder wspóldzielony między hostem a kontenerem
 
 Będąc w folderze `gs4063` klonujemy repozytorium:
@@ -240,12 +257,12 @@ cd addons
 </pre>
 Przed zbudowaniem obrazu musimy poprawić parę rzeczy po autorze.
 
-###### Modyfikacja Dockerfile
-W pliku `Dockerfile` komentujemy linijki odpowiedzialne za instalacje `satnogs-monitor/monitor` - ten moduł nie jest nam potrzebny, a ma problemy z dependencjami i sypie błędami przy próbie instalacji. 
+##### Modyfikacja Dockerfile
+W pliku `Dockerfile` komentujemy linijki odpowiedzialne za instalację `satnogs-monitor/monitor` - ten moduł nie jest nam potrzebny, a ma problemy z dependencjami i sypie błędami przy próbie instalacji. Jeśli uda nam się go naprawić, będziemy mieli dostęp do ładnego interfejsu TUI, ale póki co nie jest to żaden priorytet.
 
-###### Załączanie bias-t
-Jeśli antena podłączona jest do wzmacniacza zasilanego z bias-t (jak w naszym przypadku), musimy zarządzać włączaniem zasilania bias-t w RTL-SDR za pomocą skryptów pre/post. Jeśli nie posiadamy wzmacniacza, ten krok można pominąć. Jeśli nie posiadamy wzmacniacza, a nasza antena jest DC-zwarta (np. antena QFH), **NIE WOLNO** załączać bias-t! Może to uszkodzić wewnętrzną elektronikę SDR.
-W skrypcie `scripts/satnogs-pre" dopisujemy linijki:
+##### Załączanie bias-t
+Jeśli antena podłączona jest do wzmacniacza zasilanego z bias-t (jak w naszym przypadku), musimy zarządzać włączaniem zasilania bias-t w RTL-SDR za pomocą skryptów pre/post. Jeśli nie posiadamy wzmacniacza, ten krok można pominąć. Jeśli nie posiadamy wzmacniacza, a nasza antena jest DC-zwarta (np. antena QFH lub turnstile), **NIE WOLNO** załączać bias-t! Może to uszkodzić wewnętrzną elektronikę SDR.
+W skrypcie `scripts/satnogs-pre` dopisujemy linijki:
 <pre>
 rtl_biast -b 1 > /dev/null
 echo "bias tee on"
@@ -256,7 +273,7 @@ rtl_biast -b 0 > /dev/null
 echo "bias tee off"
 </pre>
 
-###### Obsługa SatDump
+##### Obsługa SatDump
 W skrypcie `scripts/satdump.sh` satdump jest wywoływany z nieprawidłowymi argumentami, naprawmy to:
 
 <pre>
@@ -272,10 +289,11 @@ case "$NORAD" in
     ;;
 esac
 </pre>
-Procesowanie na żywo dla NOAA APT działa jak powinno, natomiast LRPT satelitów Meteor nie działa. Można temu zaradzić poprzez przetwarzanie offline po nagraniu zapisu IQ. Jeszcze tego nie zrobiliśmy, ale mamy to w planach. Tak samo wyniki przetwarzania APT nie są przesyłane do sieci satNOGS, tylko przechowywane lokalnie; temu też zaradzimy.
+Źródłem danych jest strumień UDP, a częstotliwość wynosi 0, ponieważ strumieniowane są próbki po korekcie dopplerowskiej, wycentrowane wokół zera.
+Procesowanie na żywo dla NOAA APT działa jak powinno, natomiast LRPT satelitów Meteor nie działa. Interfejs CLI satdumpa jest jeszcze w fazie rozwojowej, więc jest to zrozumiałe. Można temu zaradzić poprzez przetwarzanie offline po nagraniu zapisu IQ. Jeszcze tego nie zrobiliśmy, ale mamy to w planach. Tak samo wyniki przetwarzania APT nie są przesyłane do sieci satNOGS, tylko przechowywane lokalnie; temu też zaradzimy.
 
-###### Obliczanie samplerate poszczególnych transmisji
-Zmienna środowiskowa `SATNOGS_RX_SAMP_RATE` nie ma wpływu na to, w jakim samplerate zostanie zapisany obraz wodospadu na portalu satNOGS, ani w jakim samplerate zostanie nagrany baseband transmisji. Jest to niepokojące szczególnie dla Meteor LRPT, które ma ok. 115kHz szerokości, a satNOGS nagrywa je w 48kHz, co skutecznie uniemożliwia wykorzystanie takiego materiału do jakichkolwiek celów. Wynika to z tego, że satnogs-client nie posiada w swojej bibliotece [satnogs-flowgraphs](https://gitlab.com/librespacefoundation/satnogs/satnogs-flowgraphs) obsługi `LRPT`, mimo, że ten znajduje się w bazie transmiterów satelitarnych (np. [Meteor M2-4](https://db.satnogs.org/satellite/VSVI-4798-5613-4587-2414#transmitters)). Najprostszy workaround dla tego problemu polega na pobraniu z repozytorium pliku [flowgraphs.py](https://gitlab.com/librespacefoundation/satnogs/satnogs-client/-/blob/master/satnogsclient/radio/flowgraphs.py) i zmodyfikowaniu go, aby transmisje `LRPT` były obsługiwane przez pipeline np. `FSK`. Może to powodować powstawanie fałszywych danych, ponieważ LRPT to sygnał modulowany BPSK, ale nie ma to wpływu na zapis baseband IQ.
+##### Obliczanie samplerate poszczególnych transmisji
+Zmienna środowiskowa `SATNOGS_RX_SAMP_RATE` nie ma wpływu na to, w jakim samplerate zostanie zapisany obraz wodospadu na portalu satNOGS, ani w jakim samplerate zostanie nagrany baseband transmisji. Jest to niepokojące szczególnie dla Meteor LRPT, które ma ok. 115kHz szerokości, a satNOGS nagrywa je w 48kHz, co skutecznie uniemożliwia wykorzystanie takiego materiału do jakichkolwiek celów. Wynika to z tego, że satnogs-client nie posiada w swojej bibliotece [satnogs-flowgraphs](https://gitlab.com/librespacefoundation/satnogs/satnogs-flowgraphs) obsługi `LRPT`, mimo, że ten znajduje się w bazie transmiterów satelitarnych (np. [Meteor M2-4](https://db.satnogs.org/satellite/VSVI-4798-5613-4587-2414#transmitters)). Z tego powodu flowgraph dispatcher defaultuje do wykorzystania pipeline "FM", który demoduluje sam dźwięk w sample rate 48kHz. Najprostszy workaround dla tego problemu polega na pobraniu z repozytorium pliku [flowgraphs.py](https://gitlab.com/librespacefoundation/satnogs/satnogs-client/-/blob/master/satnogsclient/radio/flowgraphs.py) i zmodyfikowaniu go, aby transmisje `LRPT` były obsługiwane przez pipeline np. `FSK`, który prawidłowo oblicza samplerate na podstawie baudrate odbieranego sygnału. Może to powodować powstawanie fałszywych danych, ponieważ LRPT to sygnał modulowany BPSK, ale my nie używamy tego pipeline do pozyskiwania danych, tylko do zapisu basebandu IQ.
 Zmodyfikowany plik `flowgraphs.py` zamieszczono w folderze z dokumentacją. Tuż przed końcem pliku `Dockerfile` należy dodać dyrektywę:
 <pre>
 COPY flowgraphs.py /usr/local/lib/python3.9/dist-packages/satnogsclient/radio/
@@ -286,9 +304,9 @@ Wchodzimy w katalog `satnogs-client-docker/addons` zawierający `Dockerfile` i z
 <pre>
 docker build --build-arg BUILD_SATDUMP=1 -t lsf-addons-satdump .
 </pre>
-budujemy obraz o nazwie `lsf-addons-satdump`. SatDump to naprawdę duży program, w związku z czym instalacja może trwać nawet do 30 minut (Raspberry Pi 5). Gdy będziemy chcieli zmienić coś w obrazie, np. zmodyfikować skrypty, kolejne budowanie będzie o wiele krótsze (parenaście sekund), ponieważ Docker przechowuje poszczególne etapy budowania obrazu w cache.
+budujemy obraz o nazwie `lsf-addons-satdump`. SatDump to naprawdę duży program, w związku z czym instalacja może trwać nawet do 30 minut. Gdy będziemy chcieli zmienić coś w obrazie, np. zmodyfikować skrypty, kolejne budowanie będzie o wiele krótsze (skróci się do parunastu sekund), ponieważ Docker przechowuje poszczególne etapy budowania obrazu w cache.
 
-##### Uruchomienie kontenera
+#### Konfiguracja 
 Domyślny plik `docker-compose.yml` modyfikujemy według poniższego wzoru. Należy utworzyć folder `data` i zmienić jego właściciela na `500:500`.
 
 <pre>
@@ -304,7 +322,7 @@ services:
     command: 'rigctld'
 
   satnogs_client:
-    image: lsf-addons-satdump  # nasz zbudowany obraz
+    image: lsf-addons-satdump  # lokalnie zbudowany obraz
     user: '500' # zmiana z 999
     init: true  # init is needed when launching processes in the background
     env_file:
@@ -379,3 +397,29 @@ netrigctl_close: done status=Command completed successfully
 Zaś na stronie [network.satnogs.org](https://network.satnogs.org/) w zakładce z naszymi obserwacjami po ok. 3 minutach (domyślny czas po jakim odświeża się zadanie wysłania [artefaktów](https://wiki.satnogs.org/Artifacts)) powinien pojawić się wodospad FFT.
 
 
+### Ustawienie priorytetów w autoschedulerze
+Domyślnie autoscheduler planuje obserwacje na podstawie algorytmu maksymalizującego wykorzystany czas obserwacji. Klient satNOGS nie potrafi obserwować wielu sygnałów na raz. Jest to nieoptymalne jeśli skupiamy się na satelitach pogodowych, ponieważ całe pasmo 137MHz jest w stanie zmieścić się w samplerate RTL-SDR V3. Sytuacje w których jednocześnie przelatują nad nami różne satelity pogodowe nie jest zbyt częsta, ale jak najbardziej możliwa. W każdym razie, możemy zmusić autoscheduler do planowania obserwacji wszystkich możliwych przelotów satelitów pogodowych, nawet jeśli nie są to obserwacje optymalne dla jego algorytmu. Tworzymy plik `priorities_4063.txt` i uzupełniamy go o następującą treść:
+
+<pre>
+57166 1.0 HuBvmTihdiAHcyeGkCjE8d
+59051 1.0 CjvA8tYsAqC5f7jxV8D6T9
+33591 1.0 kE4VaYKpnFmzEquEjKKi8D
+28654 1.0 u2h8AaSR7ZJPreFgVDtcfP
+25338 1.0 mjsHcYajEgbiS9cbKfecGo
+</pre>
+
+Pierwsza kolumna to numer identyfikacyjny satelity NORAD, druga to priorytet (1.0 - najwyższy), trzecia to identyfikator nadajnika (jeden satelita może mieć ich wiele). Od góry odpowiadają one: Meteor M2-3 LRPT, Meteor M2-4 LRPT, NOAA 19 APT, NOAA 18 APT, NOAA 15 APT.
+
+W skrypcie `entrypoint.sh` dodajemy argument `-P`:
+<pre>
+schedule_single_station.py -s "$SATNOGS_GS_ID" -T -d 1.5 -P /data/priorities_4063.txt
+</pre>
+
+
+
+# todo
+* skrypty post do dekodowania meteorow w satdump
+* uploadowanie satdumpowego apt/lrpt do satnogsowych artefaktow (ten wbudowany dekoder apt dziala ale satdump jest lepszy i daje wiecej obrazkow)
+* napisac skrypt ktory automatycznie zdeployuje wszystkie potrzebne modyfikacje albo w ogole caly projekt
+* jakies czyszczenie zapisow iq bo to w sumie niepotrzebne xd
+* napisac o sox bo w sumie to wciaz nie wiadomo co z tym iq zrobic tylko jest napisane o liczeniu samplerate
