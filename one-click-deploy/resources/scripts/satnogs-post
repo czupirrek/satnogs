@@ -1,0 +1,16 @@
+#!/bin/bash
+# SATNOGS_POST_OBSERVATION_SCRIPT="satnogs-post {{ID}} {{FREQ}} {{TLE}} {{TIMESTAMP}} {{BAUD}} {{SCRIPT_NAME}}"
+
+if [[ "${BIAST_ENABLE^^}" =~ (TRUE|YES|1) ]]; then
+  rtl_biast -b 0 &> /dev/null
+  echo "bias tee off"
+fi
+
+grsat.py stop "$@"
+satdump.sh stop "$@"
+meteor.sh stop "$@"
+iq_dump_rename.sh "$@"
+meteor_experimental.sh "$@"
+bandscan.sh start
+direwolf.sh start
+rotor-park.sh
