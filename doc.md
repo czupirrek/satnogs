@@ -11,12 +11,13 @@
     * PL-259 &#8594; SMA female
     * SMA female &#8594; SMA female
 
-* (opcjonalny) wzmacniacz szerokopasmowy [SPF5189Z](https://pl.aliexpress.com/item/1005007995348208.html), zmodyfikowany do zasilania przez bias-t
+* (opcjonalny) filtr bandstop FM, w naszym przypadku bardzo przydatny - niedaleko miejsca montażu stacji znajduje się kilowatowy nadajnik radia FM którego sygnał przeciąża SDRa, co skutkuje zwiększonym szumem i słabszą jakością odbioru
+* (opcjonalny) chiński wzmacniacz LNA [TQP3M9037](pl.aliexpress.com/item/1005005576142216.html), kosztuje ok. 30zł, według internautów jest o wiele lepszy od popularniejszego [SPF5189Z](https://pl.aliexpress.com/item/1005007995348208.html)
 
 (*) dysk 240GB jest zdecydowanie zbyt duży jeśli nie zdecydujemy się na zapisywanie basebandu z odebranych transmisji. Domyślnie ta opcja jest wyłączona, a pliki (nazywane [artefaktami](https://wiki.satnogs.org/Artifacts)) po wysłaniu na serwery satNOGS są usuwane z pamięci lokalnej.
 
 ### Tor RF
-Antena &#8594; adapter PL-259 do SMA female &#8594; wzmacniacz SPF5189Z &#8594; 10m kabla RG174 &#8594; 3m kabla RG174 &#8594; 15cm kabel SMA female do SMA female &#8594; RTL-SDR V3
+Antena &#8594; adapter PL-259 do SMA female &#8594; filtr bandstop FM &#8594; LNA TQP3M9037 &#8594; 10m kabla RG174 &#8594; 3m kabla RG174 &#8594; 15cm kabel SMA female do SMA female &#8594; RTL-SDR V3
 
 
 ## Antena
@@ -24,11 +25,11 @@ Antena Diamond BC-100S jest anteną przeznaczoną do odbioru sygnałów spolaryz
 ![wykresy](docs-pics/vert_lengths_perfect_ground_4.png "zysk 5/8")
 Zródło: [practicalantennas.com](https://practicalantennas.com/designs/verticals/5eights/)
 
-Dla naszego zastosowania lepsza byłaby antena typu turnstile lub QFH, ponieważ mają bardziej równomierne charakterystyki zysku.
+Dla naszego zastosowania lepsza byłaby antena typu turnstile lub QFH, ponieważ mają bardziej równomierne charakterystyki zysku i działają w polaryzacji kołowej.
 ![turnstile](docs-pics/double_turnstile.png "turnstile")
 Źródło: [researchgate.net](https://www.researchgate.net/figure/A-double-turnstile-antenna-in-free-space-a-The-3-D-view-and-b-its-radiation-pattern_fig2_282776048)
 ##### Polaryzacja
-Anteny turnstile i QFH działają w polaryzacji kołowej, czyli takiej jak ta, w jakiej operują satelity na których będziemy się skupiać. *Polarisation mismatch loss* między sygnałem transmitowanym w polarycji kołowej, a anteną odbiorczą spolaryzowaną liniowo to 3dB, więc mimo ogólnie dużego zysku anteny Diamond BC100S, wciąż tracimy nieco na jakości odbioru. Będzie to uwidoczniało słabą recepcję w przelotach "nad głową", czyli tych teoretycznie najlepszych.
+Anteny turnstile i QFH działają w polaryzacji kołowej, czyli takiej jak ta, w jakiej operują satelity na których będziemy się skupiać. *Polarisation mismatch loss* między sygnałem transmitowanym w polarycji kołowej, a anteną odbiorczą spolaryzowaną liniowo to 3dB, więc mimo ogólnie dużego zysku anteny Diamond BC100S, wciąż tracimy nieco na jakości odbioru. Z naszym setupem możemy się spodziewać w miarę dobrego pokrycia na horyzoncie (duży zysk anteny zniesie częściowo stratę niedopasowania polaryzacji), ale przeloty overhead (duża elewacja, powyżej 60 stopni) będą traciły podwójnie.
 Źródło: [microwaves101.com](https://www.microwaves101.com/encyclopedias/polarization-mismatch-between-antennas)
 
 
@@ -62,7 +63,7 @@ PersistentKeepAlive = 25</pre>
 I przeklejamy jego treść na Raspberry:
 `sudo nano /etc/wireguard/satnogs.conf`
 
-Pole <em>PersistentKeepAlive</em> jest kluczowe. Bez niego ruch z zewnątrz nie dociera do Raspberry, nie da się połączyć z nim przez ssh ani spingować. Problem ustawał tymczasowo po wysłaniu z Raspberry pingu na inną maszynę w sieci VPN. Jest to związane z działaniem firewalla i zamykaniem nieaktywnych połączeń.
+**Pole <em>PersistentKeepAlive</em> jest kluczowe**. Bez niego ruch z zewnątrz nie dociera do Raspberry, nie da się połączyć z nim przez ssh ani spingować. Problem ustawał tymczasowo po wysłaniu z Raspberry pingu na inną maszynę w sieci VPN. Jest to związane z działaniem firewalla i zamykaniem nieaktywnych połączeń.
 Sprawdzamy czy VPN działa jak powinien:
 `sudo wg-quick up satnogs`
 Upewniamy się czy połączenie zostało prawidłowo nawiązane:
@@ -182,6 +183,16 @@ W obecnym stanie rzeczy, jakiekolwiek przeloty muszą zostać zaplanowane ręczn
 <pre>
 git clone https://gitlab.com/librespacefoundation/satnogs/satnogs-auto-scheduler.git
 cd satnogs-auto-scheduler
+</pre>
+W `Dockerfile` trzeba wprowadzić zmianę i wyraźnie zaznaczyć wersję `ephem` która zostanie pobrana (4.1.5), inaczej instalacja się wysypie:
+<pre>
+# Build wheel for ephem
+RUN --mount=type=cache,target=/root/.cache/pip \
+    rm -rf /dist/ephem*.whl && \
+    pip wheel --wheel-dir /dist/ 'ephem==4.1.5'
+</pre>
+Następnie budujemy:
+<pre>
 docker compose build
 </pre>
 Modyfikujemy lekko plik `docker-compose.yml`:
@@ -233,20 +244,20 @@ done
 ##### Uruchomienie
 Kontener uruchamiamy wchodząc w folder z plikiem compose, za pomocą komendy `docker compose up -d`.
 
-### Instalacja klienta satNOGS - wersja "na wypasie" (rekomendowana)
-SatNOGS to duży projekt, ale jego oficjalny obraz nie wykorzystuje wszystkich możliwości. Skupimy się na forku [kng/satnogs-client-docker](https://github.com/kng/satnogs-client-docker), który rozszerza bazową funkcjonalność klienta satNOGS. Zawiera między innymi: 
+#### Instalacja klienta satNOGS (manualna) - skomplikowana wersja "na wypasie" 
+SatNOGS to duży projekt, ale jego oficjalne obrazy nie wykorzystują wszystkich możliwości. Skupimy się na forku [kng/satnogs-client-docker](https://github.com/kng/satnogs-client-docker), który rozszerza możliwości oryginalnych obrazów. 
 * automatyczne obliczanie samplerate zapisanego basebandu
-* rozbudowane skrypty pre- i post-obserwacyjne
-* integracja z [SatDump](https://github.com/SatDump/SatDump/tree/nightly) - najbardziej wszechstronnym oprogramowaniem do demodulowania i dekodowania sygnałów satelitarnych
-* obsługa pipeline do odbierania obrazów z satelitów Meteor (która okazała się być niedziałająca)
+* rozbudowane skrypt pre- i post-obserwacyjne
+* integracja [SatDump](https://github.com/SatDump/SatDump/tree/nightly) - najbardziej wszechstronnego oprogramowania do demodulowania i dekodowania sygnałów satelitarnych
+* obsługa pipeline do odbierania obrazów z satelitów Meteor 
 
-Mimo bycia dość rozbudowanym, projekt jest słabo udokumentowany i wymagał pewnej inżynierii wstecznej i modyfikacji paru plików, aby działał jak powinien.
+Mimo bycia dość rozbudowanym, projekt jest słabo udokumentowany i wymagał pewnej inżynierii wstecznej i modyfikacji paru plików, aby działał jak powinien. Szczególnie uciążliwa okazała się sytuacja, w której dockerowy [obraz satnogs](https://hub.docker.com/r/librespace/satnogs-client) z tagu master uległ aktualizacji i rozsypało się wszystko, co tylko mogło. Niemniej, w naszym poradniku wprowadzimy skrypt, który ogranicza żmudne wprowadzanie poprawek do zera, a użytkownik musi jedynie skonfigurować gotową stację.
 
-#### Instalacja obrazu bazowego
+##### Instalacja obrazu bazowego
 Zacznijmy od podstaw. Tworzymy folder o adekwatnej nazwie, np. `gs4063`. Będziemy w nim przechowywać:
 * plik `compose.yml`
 * plik `station.env`
-* folder z repozytorium
+* folder z repozytorium 
 * folder wspóldzielony między hostem a kontenerem
 
 Będąc w folderze `gs4063` klonujemy repozytorium:
@@ -257,8 +268,8 @@ cd addons
 </pre>
 Przed zbudowaniem obrazu musimy poprawić parę rzeczy po autorze.
 
-##### Modyfikacja Dockerfile
-W pliku `Dockerfile` komentujemy linijki odpowiedzialne za instalację `satnogs-monitor/monitor` - ten moduł nie jest nam potrzebny, a ma problemy z dependencjami i sypie błędami przy próbie instalacji. Jeśli uda nam się go naprawić, będziemy mieli dostęp do ładnego interfejsu TUI, ale póki co nie jest to żaden priorytet.
+###### Modyfikacja Dockerfile
+W pliku `Dockerfile` komentujemy linijki odpowiedzialne za instalacje modułów `satnogs-monitor/monitor`, `beesat-sdr` - te moduły nie będą nam potrzebne, a mają problemy z dependencjami i sypią błędami przy próbie instalacji. 
 
 ##### Załączanie bias-t
 Jeśli antena podłączona jest do wzmacniacza zasilanego z bias-t (jak w naszym przypadku), musimy zarządzać włączaniem zasilania bias-t w RTL-SDR za pomocą skryptów pre/post. Jeśli nie posiadamy wzmacniacza, ten krok można pominąć. Jeśli nie posiadamy wzmacniacza, a nasza antena jest DC-zwarta (np. antena QFH lub turnstile), **NIE WOLNO** załączać bias-t! Może to uszkodzić wewnętrzną elektronikę SDR.
@@ -274,37 +285,35 @@ echo "bias tee off"
 </pre>
 
 ##### Obsługa SatDump
-W skrypcie `scripts/satdump.sh` satdump jest wywoływany z nieprawidłowymi argumentami, naprawmy to:
+W skrypcie `scripts/satdump.sh` satdump jest wywoływany w momencie rozpoczęcia obserwacji. Ten skrypt jest całkowicie źle napisany - nieprawidłowe argumenty wywołania programu satdump, niedziałające uploadowanie wyników, zła obsługa zmiennych środowiskowych. Niemniej, nawet po wprowadzeniu poprawek do skryptu, zauważyliśmy, że o ile procesowanie na żywo dla NOAA APT działa jak powinno, to LRPT satelitów Meteor nie działa. Zapisanie basebandu z obserwacji i następnie zdekodowanie go "offline" wskazywało na to, że był to błąd satdumpa. Nie ma się czemu dziwić - jest to oprogramowanie eksperymentalne. Żeby temu zaradzić, postanowiono pozbyć się skryptu dekodującego na żywo na rzecz skryptu dekodującego sygnały po zakończeniu obserwacji. Żeby go stworzyć, najpierw trzeba wytłumaczyć jak satnogs-client zapisuje dane.
 
-<pre>
-case "$NORAD" in
-  "25338") # NOAA 15
-    OPT="live noaa_apt $OUT --source net_source --mode udp --port $UDP_DUMP_PORT --satellite_number 15 --samplerate $SAMP --frequency 0"
-    ;;
-  "28654") # NOAA 18
-    OPT="live noaa_apt $OUT --source net_source --mode udp --port $UDP_DUMP_PORT --satellite_number 18 --samplerate $SAMP --frequency 0"
-    ;;
-  "33591") # NOAA 19
-    OPT="live noaa_apt $OUT --source net_source --mode udp --port $UDP_DUMP_PORT --satellite_number 19 --samplerate $SAMP --frequency 0"
-    ;;
-esac
-</pre>
-Źródłem danych jest strumień UDP, a częstotliwość wynosi 0, ponieważ strumieniowane są próbki po korekcie dopplerowskiej, wycentrowane wokół zera.
-Procesowanie na żywo dla NOAA APT działa jak powinno, natomiast LRPT satelitów Meteor nie działa. Interfejs CLI satdumpa jest jeszcze w fazie rozwojowej, więc jest to zrozumiałe. Można temu zaradzić poprzez przetwarzanie offline po nagraniu zapisu IQ. Jeszcze tego nie zrobiliśmy, ale mamy to w planach. Tak samo wyniki przetwarzania APT nie są przesyłane do sieci satNOGS, tylko przechowywane lokalnie; temu też zaradzimy.
-
-##### Obliczanie samplerate poszczególnych transmisji
-Zmienna środowiskowa `SATNOGS_RX_SAMP_RATE` nie ma wpływu na to, w jakim samplerate zostanie zapisany obraz wodospadu na portalu satNOGS, ani w jakim samplerate zostanie nagrany baseband transmisji. Jest to niepokojące szczególnie dla Meteor LRPT, które ma ok. 115kHz szerokości, a satNOGS nagrywa je w 48kHz, co skutecznie uniemożliwia wykorzystanie takiego materiału do jakichkolwiek celów. Wynika to z tego, że satnogs-client nie posiada w swojej bibliotece [satnogs-flowgraphs](https://gitlab.com/librespacefoundation/satnogs/satnogs-flowgraphs) obsługi `LRPT`, mimo, że ten znajduje się w bazie transmiterów satelitarnych (np. [Meteor M2-4](https://db.satnogs.org/satellite/VSVI-4798-5613-4587-2414#transmitters)). Z tego powodu flowgraph dispatcher defaultuje do wykorzystania pipeline "FM", który demoduluje sam dźwięk w sample rate 48kHz. Najprostszy workaround dla tego problemu polega na pobraniu z repozytorium pliku [flowgraphs.py](https://gitlab.com/librespacefoundation/satnogs/satnogs-client/-/blob/master/satnogsclient/radio/flowgraphs.py) i zmodyfikowaniu go, aby transmisje `LRPT` były obsługiwane przez pipeline np. `FSK`, który prawidłowo oblicza samplerate na podstawie baudrate odbieranego sygnału. Może to powodować powstawanie fałszywych danych, ponieważ LRPT to sygnał modulowany BPSK, ale my nie używamy tego pipeline do pozyskiwania danych, tylko do zapisu basebandu IQ.
+###### Obliczanie samplerate poszczególnych transmisji
+Zmienna środowiskowa `SATNOGS_RX_SAMP_RATE` nie ma wpływu na to, w jakim samplerate zostanie zapisany obraz wodospadu na portalu satNOGS, ani w jakim samplerate zostanie nagrany baseband transmisji. Jest to niepokojące szczególnie dla Meteor LRPT, które ma ok. 115kHz szerokości, a satNOGS nagrywa je w 48kHz, co skutecznie uniemożliwia wykorzystanie takiego materiału do jakichkolwiek celów. Wynika to z tego, że satnogs-client nie posiada w swojej bibliotece [satnogs-flowgraphs](https://gitlab.com/librespacefoundation/satnogs/satnogs-flowgraphs) obsługi `LRPT`, mimo, że ten tryb znajduje się w bazie transmiterów satelitarnych (np. [Meteor M2-4](https://db.satnogs.org/satellite/VSVI-4798-5613-4587-2414#transmitters)). Najprostszy workaround dla tego problemu polega na pobraniu z repozytorium pliku [flowgraphs.py](https://gitlab.com/librespacefoundation/satnogs/satnogs-client/-/blob/master/satnogsclient/radio/flowgraphs.py) i zmodyfikowaniu go, aby transmisje `LRPT` były obsługiwane przez pipeline np. `FSK`. Może to powodować powstawanie fałszywych danych, ponieważ LRPT to sygnał modulowany QPSK, ale nie ma to wpływu na zapis baseband IQ.
 Zmodyfikowany plik `flowgraphs.py` zamieszczono w folderze z dokumentacją. Tuż przed końcem pliku `Dockerfile` należy dodać dyrektywę:
 <pre>
 COPY flowgraphs.py /usr/local/lib/python3.9/dist-packages/satnogsclient/radio/
 </pre>
+
+Świetnie. Teraz mamy pewność, że surowe dane z obserwacji będą zapisywane z odpowiednią szerokością pasma. Jednakże są to dane w postawi surowej, binarnej. Satdump (lub inne programy do odsłuchu) są w stanie otworzyć takie pliki, ale będą "zniekształcone", tzn. szerokość pasma nie będzie się zgadzała z rzeczywistą. Rozwiążemy to przez opakowanie pliku `raw` do kontenera `wav` - jest to format powszechnie obsługiwany przez programy do odsłuchu basebandu, w jego nagłówku są zawarte wszystkie informacje potrzebne do prawidłowego jego otwarcia. Wykorzystamy program `sox`, wywoływany jest w ten sposób:
+<pre>sox -t raw -b 16 -e signed-integer -r "$SAMP" -c 2 "$INPUT_RAW" "$OUTPUT_WAV"</pre> 
+gdzie `$SAMP` to samplerate zapisanego sygnału.
+
+###### Dekodowanie offline w SatDump
+Satnogs-client zapisuje surowe dane w postaci doppler-corrected, czyli sygnał jest wycentrowany w jednym punkcie; satdump ogólnie tego nie lubi i deweloperzy aktywnie zniechęcają przed stosowaniem tej techniki. Niestety nie mamy na to wpływu, ale mimo to satdump radzi sobie z takim formatem danych nienajgorzej (jeśli dobrze to rozumiemy, to małe zmiany częstotliwości są w stanie odblokować [PLL](https://pl.wikipedia.org/wiki/P%C4%99tla_synchronizacji_fazy) co ma znaczenie przy sygnałach cyfrowych, gdzie sygnał trzeba "złapać"). W każdym razie, efektem końcowym tego rozdziału było opracowanie skryptu, który:
+- parsuje NORAD z przekazanego przez program nadrzędny pliku `.tle`
+- jeśli NORAD jest zgodny z którymś z obsługiwanych przez skrypt satelitów, baseband jest konwertowany z `raw` na `wav` przy użyciu programu `sox`
+- wywołuje `satdump` z **właściwymi** argumentami
+- usuwa niepotrzebny już plik `wav`
+- po zdekodowaniu sprawdza czy wyprodukowano obrazy; jeśli tak - obrazy naniesione na mapę są usuwane (lepiej wyglądają "surowe')
+- największy pozostały plik `.png` zostaje wysłany na serwery satnogs
+
 
 ##### Budowanie obrazu 
 Wchodzimy w katalog `satnogs-client-docker/addons` zawierający `Dockerfile` i za pomocą komendy:
 <pre>
 docker build --build-arg BUILD_SATDUMP=1 -t lsf-addons-satdump .
 </pre>
-budujemy obraz o nazwie `lsf-addons-satdump`. SatDump to naprawdę duży program, w związku z czym instalacja może trwać nawet do 30 minut. Gdy będziemy chcieli zmienić coś w obrazie, np. zmodyfikować skrypty, kolejne budowanie będzie o wiele krótsze (skróci się do parunastu sekund), ponieważ Docker przechowuje poszczególne etapy budowania obrazu w cache.
+budujemy obraz o nazwie `lsf-addons-satdump`. SatDump to naprawdę duży program, w związku z czym instalacja może trwać nawet do 30 minut. Gdy będziemy chcieli zmienić coś w obrazie, np. zmodyfikować skrypty, kolejne budowanie będzie o wiele krótsze (skróci się do parunastu sekund), ponieważ Docker przechowuje poszczególne etapy budowania obrazu w cache. W razie gdyby coś dziwnego stało się ze scache'owanymi etapami budowy, można dopisać `--no-cache`, co wymusi zbudowanie obrazu całkowicie od nowa.
 
 #### Konfiguracja 
 Domyślny plik `docker-compose.yml` modyfikujemy według poniższego wzoru. Należy utworzyć folder `data` i zmienić jego właściciela na `500:500`.
@@ -367,7 +376,7 @@ SATNOGS_PRE_OBSERVATION_SCRIPT=satnogs-pre {{ID}} {{FREQ}} {{TLE}} {{TIMESTAMP}}
 SATNOGS_POST_OBSERVATION_SCRIPT=satnogs-post {{ID}} {{FREQ}} {{TLE}} {{TIMESTAMP}} {{BAUD}} {{SCRIPT_NAME}}
 UDP_DUMP_HOST=0.0.0.0
 
-#ścieżki będą potrzebne jeśli zechcemy wysyłać do bazy satnogs obrazki pozyskane z satdumpa
+#ścieżki będą potrzebne jeśli zechcemy wysyłać do bazy satnogs obrazki(artefakty) pozyskane z satdumpa
 SATNOGS_OUTPUT_PATH="/data/app/data"
 SATNOGS_COMPLETE_OUTPUT_PATH="/data/app/data/complete"
 SATNOGS_INCOMPLETE_OUTPUT_PATH="/data/app/data/incomplete"
@@ -376,15 +385,14 @@ SATNOGS_APP_PATH="/data/app"
 #iq dump potrzebny do offline'owego procesowania w satdump
 ENABLE_IQ_DUMP="True"
 IQ_DUMP_FILENAME="/data/iq"
-IQ_DUMP_RENAME="True"
-IQ_DUMP_COMPRESS="True"
+#poniższe można odkomentować, jeśli chcemy zachować surowe dane (zżera dużo miejsca, ale przydatne do debugowania)
+#IQ_DUMP_RENAME="True"
+#IQ_DUMP_COMPRESS="True"
 
-#aktualnie satdump działa tylko dla NOAA APT
-SATDUMP_ENABLE="True"
-SATDUMP_KEEPLOGS="Yes" # tajemniczo skrypt akceptuje tylko "yes"????
+METEOR_EXPERIMENTAL="True" # nasz skrypt do offline'owego dekodowania meteorów w satdumpie
 </pre>
 
-Kontener odpalamy za pomocą `docker compose up -d`. Najlepiej poczekać do kolejnej obserwacji i sprawdzić w logach czy wszystko działa jak powinno - w czasie uruchamiania ujawni się nazwa naszego kontenera, wpisujemy komendę `docker logs nazwa`. W trakcie dobrej obserwacji powinniśmy widzieć:
+Kontener odpalamy za pomocą `docker compose up -d`. Najlepiej poczekać do kolejnej obserwacji i sprawdzić w logach czy wszystko działa jak powinno - w czasie uruchamiania ujawni się nazwa naszego kontenera wpisujemy komendę `docker logs nazwa`. Nazwę kontenera można też sprawdzić poleceniem `docker ps`, które wyświetla aktualnie uruchomione kontenery. W trakcie dobrej obserwacji powinniśmy widzieć:
 <pre>
 [R82XX] PLL not locked!
 [INFO] Using format CF32.
@@ -398,7 +406,8 @@ Zaś na stronie [network.satnogs.org](https://network.satnogs.org/) w zakładce 
 
 
 ### Ustawienie priorytetów w autoschedulerze
-Domyślnie autoscheduler planuje obserwacje na podstawie algorytmu maksymalizującego wykorzystany czas obserwacji. Klient satNOGS nie potrafi obserwować wielu sygnałów na raz. Jest to nieoptymalne jeśli skupiamy się na satelitach pogodowych, ponieważ całe pasmo 137MHz jest w stanie zmieścić się w samplerate RTL-SDR V3. Sytuacje w których jednocześnie przelatują nad nami różne satelity pogodowe nie jest zbyt częsta, ale jak najbardziej możliwa. W każdym razie, możemy zmusić autoscheduler do planowania obserwacji wszystkich możliwych przelotów satelitów pogodowych, nawet jeśli nie są to obserwacje optymalne dla jego algorytmu. Tworzymy plik `priorities_4063.txt` i uzupełniamy go o następującą treść:
+Domyślnie autoscheduler planuje obserwacje na podstawie algorytmu maksymalizującego wykorzystany czas obserwacji. Klient satNOGS nie potrafi obserwować wielu sygnałów na raz. Jest to nieoptymalne jeśli skupiamy się na satelitach pogodowych, ponieważ całe pasmo 137MHz jest w stanie zmieścić się w samplerate RTL-SDR V3 (wynosi ok. 2.4 MHz). Sytuacje w których jednocześnie przelatują nad nami różne satelity pogodowe nie jest zbyt częsta, ale jak najbardziej możliwa. Z tego powodu, jeśli chcemy zbudować stację pogodową VHF lepiej jest zainteresować się bliżej oprogramowaniem SatDump. W każdym razie, możemy zmusić autoscheduler do planowania obserwacji wszystkich możliwych przelotów satelitów pogodowych, nawet jeśli nie są to obserwacje optymalne według jego algorytmu.
+Tworzymy plik `priorities_4063.txt` i uzupełniamy go o następującą treść:
 
 <pre>
 57166 1.0 HuBvmTihdiAHcyeGkCjE8d
@@ -415,11 +424,10 @@ W skrypcie `entrypoint.sh` dodajemy argument `-P`:
 schedule_single_station.py -s "$SATNOGS_GS_ID" -T -d 1.5 -P /data/priorities_4063.txt
 </pre>
 
+## Automatyczny deploy 
+Jak widać w poprzednim rozdziale, uruchomienie satnogs-client i wyposażenie go w pełną funkcjonalność nie jest takie proste jak opisują to poradniki w sieci. Żeby oszczędzić nerwów przyszłym operatorom stacji satnogs, opracowaliśmy skrypt który pozwoli wykonać deploy tego oprogramowania jednym klikiem. Rola użytkownika ogranicza się do zainstalowania dependencji (Docker, git) i uzupełnieniu pliku `.env`.
 
+Skrypt z folderu `one-click-deploy` należy uruchomić z uprawnieniami roota (sudo):
+<pre>sudo ./deploy.sh</pre>
+Instalowanie satnogs-client od zera może trwać dość długo, nawet ok. 30-40 minut. Jest to spowodowane obecnością ciężkiego satdumpa. Po zainstalowaniu, w folderze ze skryptem pojawi się folder `deploy` zawierający gotowe oprogramowanie.
 
-# todo
-* skrypty post do dekodowania meteorow w satdump
-* uploadowanie satdumpowego apt/lrpt do satnogsowych artefaktow (ten wbudowany dekoder apt dziala ale satdump jest lepszy i daje wiecej obrazkow)
-* napisac skrypt ktory automatycznie zdeployuje wszystkie potrzebne modyfikacje albo w ogole caly projekt
-* jakies czyszczenie zapisow iq bo to w sumie niepotrzebne xd
-* napisac o sox bo w sumie to wciaz nie wiadomo co z tym iq zrobic tylko jest napisane o liczeniu samplerate
