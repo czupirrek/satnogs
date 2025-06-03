@@ -17,7 +17,7 @@
 (*) dysk 240GB jest zdecydowanie zbyt duży jeśli nie zdecydujemy się na zapisywanie basebandu z odebranych transmisji. Domyślnie ta opcja jest wyłączona, a pliki (nazywane [artefaktami](https://wiki.satnogs.org/Artifacts)) po wysłaniu na serwery satNOGS są usuwane z pamięci lokalnej.
 
 ### Tor RF
-Antena &#8594; adapter PL-259 do SMA female &#8594; filtr bandstop FM &#8594; LNA TQP3M9037 &#8594; 10m kabla RG174 &#8594; 3m kabla RG174 &#8594; 15cm kabel SMA female do SMA female &#8594; RTL-SDR V3
+Antena &#8594; adapter PL-259 do SMA female &#8594; filtr bandstop FM &#8594; ok. 1m kabla TV 75 Ohm &#8594; LNA TQP3M9037 &#8594; 10m kabla RG174 &#8594; 3m kabla RG174 &#8594; 30cm kabel SMA female do SMA female &#8594; RTL-SDR V3
 
 
 ## Antena
@@ -31,6 +31,7 @@ Dla naszego zastosowania lepsza byłaby antena typu turnstile lub QFH, ponieważ
 ##### Polaryzacja
 Anteny turnstile i QFH działają w polaryzacji kołowej, czyli takiej jak ta, w jakiej operują satelity na których będziemy się skupiać. *Polarisation mismatch loss* między sygnałem transmitowanym w polarycji kołowej, a anteną odbiorczą spolaryzowaną liniowo to 3dB, więc mimo ogólnie dużego zysku anteny Diamond BC100S, wciąż tracimy nieco na jakości odbioru. Z naszym setupem możemy się spodziewać w miarę dobrego pokrycia na horyzoncie (duży zysk anteny zniesie częściowo stratę niedopasowania polaryzacji), ale przeloty overhead (duża elewacja, powyżej 60 stopni) będą traciły podwójnie.
 Źródło: [microwaves101.com](https://www.microwaves101.com/encyclopedias/polarization-mismatch-between-antennas)
+
 
 
 ## Konfiguracja środowiska
@@ -431,3 +432,45 @@ Skrypt z folderu `one-click-deploy` należy uruchomić z uprawnieniami roota (su
 <pre>sudo ./deploy.sh</pre>
 Instalowanie satnogs-client od zera może trwać dość długo, nawet ok. 30-40 minut. Jest to spowodowane obecnością ciężkiego satdumpa. Po zainstalowaniu, w folderze ze skryptem pojawi się folder `deploy` zawierający gotowe oprogramowanie.
 
+## Podsumowanie toru RF
+W trakcie trwania projektu tor RF był wielokrotnie modyfikowany. Zamówiliśmy również analizator nanoVNA, aby lepiej przyjrzeć się które jego elementy najbardziej nas ograniczają.
+
+![s11ant](docs-pics/vna/ANTs11-100-160.png "s11 antena")
+Wykres rezonansu anteny Diamond BC-100S. Jak widać, nie jest dobrze wystrojona do naszych celów (peak w 115MHz). Da się ją zmodyfikować przez skrócenie "drutu" w jej wnętrzu, ale nie zdecydowaliśmy się na ten krok - analizator dotarł do nas zbyt późno.
+
+![s21fm](docs-pics/vna/s21-fmblock.png "s21fm")
+Wykres przedstawiający tłumienie filtru FM-bandstop. Co prawda tracimy nieco sygnału w interesującym nas paśmie, ale pożytek płynący z niemal całkowitego wyeliminowania wpływu pasma FM na nasze obserwacje był nieoceniony. Zlokalizowany około 1km od naszej stacji bazowej nadajnik FM lokalnego radia o mocy 1kW był w stanie przeciążyć RTL-SDR i powodować występowanie miraży sygnału FM na częstotliwościach harmonicznych, oraz ogólne zwiększał poziomu szumu.
+
+Jeśli chcielibyśmy skupiać się **tylko** na satelitach pogodowych, wtedy od filtru FM-bandstop lepszy byłby filtr SAW przeznaczony na pasmo 137MHz. W sprzedaży są również połączenia SAW+LNA, np. [NooElec SAWbird+ NOAA](https://www.amazon.pl/NooElec-SAWbird-NOAA-zastosowa%C5%84-Cz%C4%99stotliwo%C5%9B%C4%87/dp/B07TWPR871). Wykorzystanie takiego produktu 2w1 pozwala uprościć tor RF.
+
+![s21-10m](docs-pics/vna/s21-kabel.png "10m")
+Wykres przedstawiający tłumienie sygnału przez tani, cienki kabel RG-174 o długości ok. 10m. Byliśmy zmuszeni skorzystać z tego przewodu, ponieważ jedyną drogą od anteny do Raspberry było przeciągnięcie kabla przez okno, a RG-174 jest bardzo cienki i dobrze się do tego spisał. Lepszą alternatywą byłoby zastosowanie kabla RG-58, który nie jest szczególnie drogi (ok. 3zł/m), a oferuje o wiele mniejsze tłumienie w paśmie VHF.
+
+Tłumienie sygnału na drodze od anteny do RTL-SDR niwelujemy w pewnym stopniu wykorzystując wzmacniacz zamontowany tuż przy antenie. Pomaga on sygnałowi "przebić się" przez słabej jakości kabel.
+
+![s21-krotki](docs-pics/vna/s21-krotki.png "krotki")
+Dla porównania wykres tłumienia sygnau przez kabel RG-174 nieco lepszej jakości, ale przede wszystkim o wiele krótszy - ok. 30cm. Tłumienie praktycznie nie występuje.
+
+
+
+
+
+
+## Tracker
+Pierwotnie w założeniach projektu planowaliśmy zbudowanie trackera satelitarnego. Nasz wybór padł na [satNOGS Rotator v3](https://wiki.satnogs.org/SatNOGS_Rotator_v3) - jest to open-source'owy projekt stworzony właśnie na potrzeby stacji bazowych satnogs. Jego konstrukcja wykorzystuje łatwo dostępne elementy: są to części drukowane 3d, standardowe metalowe ramy 2020 (popularne np. w środowisku osób budujących drukarki 3d DIY, ale też w sklepach meblowych), i elementy elektroniczne dostępne w sklepach typu [botland](https://botland.com.pl/) czy [kamami](https://kamami.pl/). Według naszego kosztorysu całość projektu w wariancie z wykorzystaniem silników krokowych można zamknąć w kwocie około 700zł lub mniej. Pliki `.stl` można znaleźć w folderze `tracker`. Zalecamy zweryfikować czy zgadzają się z zawartością oficjalnego [repo](https://gitlab.com/librespacefoundation/satnogs/satnogs-rotator/-/tree/master) - choć w chwili pisania tego dokumentu ostatni commit miał miejsce 3 lata temu, to zawsze coś mogło się zmienić. W razie zmian, należy je samemu wyeksportować z plików `.fcstd` FreeCAD.
+BOM do wydruku 3d zalecamy zaczerpnąć prosto ze źródła, natomiast aby ułatwić znalezienie reszty produktów, w folderze znajduje się BOM z linkami do zakupu pozostałych elementów z polskich źródeł. Brakuje w nim zasilacza - planowaliśmy użyć jakiegoś z "własnych zasobów". Oprócz tego, satnogs-rotator w projekcie uwzględnia customowe PCB i wykorzystanie Arduino - my chcieliśmy użyć ESP32 i ominąć zamawianie płytki z Chin.
+Niestety, nie udało nam się zrealizować tej części projektu ze względu na opóźnienia logistyczne.
+
+# Jak można poprawić satNOGS?
+Po naszych doświadczeniach z oprogrmowaniem satNOGS, postanowiliśmy skontaktować się Libre Space Foundation (twórcami i maintenerami projektu), w celu rozwiania paru wątpliwości:
+- dlaczego dokumentacja projektu jest aż tak nieaktualna i uboga? W obecnym stanie rzeczy, konfiguracja satnogs-client zdaje się być raczej wycelowana w stronę power-userów, aniżeli zwykłych hobbystów.
+- jak działają pipeline'y CI/CD w oficjalnym repozytorium? Do brancha master trafiają commity całkowicie blokujące działanie oprogramowania, i o ile nie jest to coś niespotykanego, to te błędy nie są naprawiane **tygodniami**, a to już budzi zaniepokojenie. Tak samo zdarza się, że obrazy trafiające na dockerhub, również pod tagiem *master*, nie przechodzą nawet testów, i Dockerfile nie jest w stanie się zbudować. Podkreślamy, że to tag *master*, a nie *unstable*.
+- migracja z wersji satnogs-client 1.9.3 na nowszą (tzn. zaktualizowany obraz z tagu *master*) wprowadzała tyle zmian bez kompatybilności wstecznej, że nasz setup całkowicie przestał działać. Żeby nie tracić postępu forsowaliśy użycie wersji 1.9.3, ale byłoby przyjemnie, gdyby została zachowana pewna ciągłość. Żeby nie było - próbowaliśmy modyfikować nasz Dockerfile, ale błędy sięgały tak głęboko, że okazało się to bezcelowe.
+- w bazie danych transmiterów satelitarnych [db.satnogs.org](https://db.satnogs.org/) widnieją takie tryby transmisji jak np. LRPT (satelity Meteor), ale satnogs-client nie ma możliwości, by te transmisje odebrać. Biblioteka satnogs-flowgraps nie zawiera pipeline dla LRPT, a zatem satnogs-client wybiera domyślną opcję dekodera FM, co właściwie czyni obserwacje satelitów meteor całkowicie bezsensownym - w wynikowej szerokości pasma 48kHz, sygnał z satelity o szerokości ok. 115kHz wygląda jak zmieniający się poziom szumu. Uważamy to za duże przeoczenie, i myślimy, że satnogs powinien mieć opcję wyboru defaultowego flowgraphu, np. recordera IQ w pełnym dostępnym samplerate.
+- rozwijając poprzedni punkt - kwestia dodawania własnych funkcjonalności. Satnogs to modularne oprogramowanie, ale dodawanie własnych demodulatorów/dekoderów za pomocą satnogs-flowgraphs jest dla nas niejasne. Dokumentacja wskazuje tylko, jak tworzyć flowgraphy w GNURadio, nie wiadomo jednak jak zintegrować je z satnogs-client. Nasza "teoria" jest taka, że należy utworzyć własnego forka satnogs-flowgraphs, zmodyfikować flowgraphy GNURadio; następnie zbudować obraz satnogs-flowgraphs, i na jego bazie zbudować satnogs-client. Tyle wyniknęło z naszej analizy plików Dockerfile, ale może być błędna.
+
+Po tygodniu od wysłania maila nie spotkaliśmy się z odzewem. Możemy więc hipotetyzować odpowiedzi na niektóre z naszych pytań.
+- Ubogość dokumentacji można wytłumaczyć tym, że satnogs, jako projekt open-source, musi się mierzyć z brakiem odpowiedniej siły roboczej. Osoby, które biorą czynny udział w utrzymywaniu tego projektu zapewne nie potrzebują posiłkować się dokumentacją, ponieważ sami znają działanie programu "od podszewki". Nie sprzyja to jednak wysokiemu progu wejścia dla nowych użytkowników, entuzjastów, którzy mogą szybko się zrazić do satnogs i zrezygnować z przyłączenia się do tej otwartoźródłowej sieci.
+- Na kwestię wadliwych pipeline'ów CI/CD nieprzechodzących testów nie jesteśmy w stanie jednoznacznie odpowiedzieć. Być może fundacja LSF po prostu nie ma w swoim zespole zdolnego devopsa. Niemniej, niektóre z występujących błędów można było naprawić one-linerem, a mimo to pozostawały w repozytorium tygodniami, na co nie widzimy wytłumaczenia.
+- Demodulator/dekoder LRPT może być trudny do zrealizowania. Przed spopularyzowaniem naprawdę rewolucyjnego w półświatku hobbystów *sat-rx* programu SatDump, nie istniało żadne oprogramowanie *all-in-one*, które było w stanie jednocześnie zdemodulować i zdekodować ten sygnał. TO czyniło pozyskiwanie obrazów z satelitów Meteor nieco skomplikowanym procesem. To zadanie w środowisku GNURadio może być po prostu niewarte zachodu.
+- Utworzenie uniwersalnego flowgraphu do nagrywania zapisu IQ: rezultaty wszelkich uruchomień flowgraphów są wysyłane na serwery satnogs - są to np. ramki APRS, obrazy SSTV, obrazy APT, generyczna telemetria itd. Zakładając, że taki uniwersalny flowgraph nagrywałby całe pasmo odbierane przez SDR (załóżmy 1MHz), to taki plik .wav ważyłby setki MB. Porównajmy to z kilobajtami dekodowanych danych binarnych, lub megabajtami obrazów lub zapisów próbek dźwiękowych FM (48kHz). Satnogs jest projektem non-profit, a przestrzeń dyskowa na serwerach nie jest darmowa.
