@@ -1,3 +1,7 @@
+## O projekcie
+
+Celem projektu jest stworzenie stacji bazowej satNOGS. satNOGS powstał jako projekt służący głównie operatorom amatorskich satelitów cubesat, często wysyłanych na orbitę przez różne uczelnie w ramach programów naukowych. Takie jednostki często nie mają odpowiednich zasobów na dostęp do profesjonalnych sieci stacji bazowych, i mogą być ograniczone do odbioru telemetrii ze swoich satelitów np. tylko wtedy, gdy przelatują nad swoją uczelnią. Tu wkracza satNOGS z pomysłem, by utworzyć otwartoźródłową sieć takich prostych stacji bazowych rozsianych po całym świecie.
+
 ## Wykorzystany sprzęt
 
 * Raspberry Pi 5 (8GB ram)
@@ -32,7 +36,19 @@ Dla naszego zastosowania lepsza byłaby antena typu turnstile lub QFH, ponieważ
 Anteny turnstile i QFH działają w polaryzacji kołowej, czyli takiej jak ta, w jakiej operują satelity na których będziemy się skupiać. *Polarisation mismatch loss* między sygnałem transmitowanym w polarycji kołowej, a anteną odbiorczą spolaryzowaną liniowo to 3dB, więc mimo ogólnie dużego zysku anteny Diamond BC100S, wciąż tracimy nieco na jakości odbioru. Z naszym setupem możemy się spodziewać w miarę dobrego pokrycia na horyzoncie (duży zysk anteny zniesie częściowo stratę niedopasowania polaryzacji), ale przeloty overhead (duża elewacja, powyżej 60 stopni) będą traciły podwójnie.
 Źródło: [microwaves101.com](https://www.microwaves101.com/encyclopedias/polarization-mismatch-between-antennas)
 
+#### Satelity
+Obecnie większość amatorskich satelitów transmituje telemetrię w paśmie 70cm, czyli ok. 430MHz. Jest to dyktowane głównie dostępnością tego pasma oraz rozmiarem wykorzystanej anteny (amatorskie satelity nie są duże). My dysponujemy anteną Diamond BC100S przystosowaną do odbioru częstotliwości 115 MHz - 160 MHz. Na tym paśmie można spotkać głównie satelity pogodowe (137 MHz) oraz transmisje z ISS (145 MHz).
+ Skupimy się przede wszystkim na satelitach pogodowych NOAA i Meteor:
 
+| l.p. |   satelita  | częstotliwość (MHz) |                          komentarz                         |
+|:----:|:-----------:|:-------------------:|:----------------------------------------------------------:|
+|    1 |   NOAA 15   |        137.62       |                    sygnał analogowy APT                    |
+|    2 |   NOAA 18   |       137.9125      | sygnał analogowy APT. Satelita poddany dekomisji 6.06.2025 |
+|    3 |   NOAA 19   |        137.1        |                    sygnał analogowy APT                    |
+|    4 | Meteor M2-3 |        137.9        |                     sygnał cyfrowy LRPT                    |
+|    5 | Meteor M2-4 |        137.9        |                     sygnał cyfrowy LRPT                    |
+
+W trakcie trwania projektu, satelita NOAA 18 został poddany dekomisji i całkowicie wyłączony w skutek awarii transceivera używanego do TT&C (Telemetry, Tracking and Command). Administracja NOAA porzuciła wsparcie dla satelitów 15 i 19 z powodu cięcia kosztów. Istnieje szansa, że do końca roku pozostałe satelity również zostaną wyłączone i jedynymi satelitami w paśmie VHF pozostaną Meteory.
 
 ## Konfiguracja środowiska
 
@@ -436,7 +452,10 @@ Instalowanie satnogs-client od zera może trwać dość długo, nawet ok. 30-40 
 W trakcie trwania projektu tor RF był wielokrotnie modyfikowany. Zamówiliśmy również analizator nanoVNA, aby lepiej przyjrzeć się które jego elementy najbardziej nas ograniczają.
 
 ![s11ant](docs-pics/vna/ANTs11-100-160.png "s11 antena")
-Wykres rezonansu anteny Diamond BC-100S. Jak widać, nie jest dobrze wystrojona do naszych celów (peak w 115MHz). Da się ją zmodyfikować przez skrócenie "drutu" w jej wnętrzu, ale nie zdecydowaliśmy się na ten krok - analizator dotarł do nas zbyt późno.
+Pierwotny wykres rezonansu anteny Diamond BC-100S. Jak widać, nie jest dobrze wystrojona do naszych celów (peak w 115MHz). Da się ją zmodyfikować przez skrócenie "drutu" w jej wnętrzu.
+
+![s11tuned](docs-pics/vna/tuned.png "s11 tuned")
+Wykres rezonansu anteny po jej wystrojeniu. Ucięło się nam troszkę zbyt dużo, przez co *peak* rezonansu jest bliżej częstotliwości 137.8 niż 137.5 MHz, ale to żaden problem - powinno to skutkować lepszym odbiorem Meteorów na częstotliwości 137.9 MHz, a straci trochę NOAA 19 na 137.1. Na 137.9125 MHz nadawał również NOAA18, ale został poddany dekomisji w dniu 6.06.2025 ok. godziny 19:30 czasu lokalnego.
 
 ![s21fm](docs-pics/vna/s21-fmblock.png "s21fm")
 Wykres przedstawiający tłumienie filtru FM-bandstop. Co prawda tracimy nieco sygnału w interesującym nas paśmie, ale pożytek płynący z niemal całkowitego wyeliminowania wpływu pasma FM na nasze obserwacje był nieoceniony. Zlokalizowany około 1km od naszej stacji bazowej nadajnik FM lokalnego radia o mocy 1kW był w stanie przeciążyć RTL-SDR i powodować występowanie miraży sygnału FM na częstotliwościach harmonicznych, oraz ogólne zwiększał poziomu szumu.
